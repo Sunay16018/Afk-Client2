@@ -26,6 +26,23 @@
         .bot-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #161b22; border: 1px solid #30363d; margin-top: 8px; border-radius: 8px; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; background: #1f6feb; }
         input { background: #010409; border: 1px solid #30363d; color: #fff; padding: 10px; border-radius: 6px; width: 100%; }
+        
+        /* YENİ EKLENEN STILLER */
+        .movement-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px auto; max-width: 300px; }
+        .movement-btn { padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; background: #238636; font-size: 16px; }
+        .movement-btn:hover { opacity: 0.9; }
+        .movement-btn:active { transform: scale(0.95); }
+        #btn-jump { grid-column: 2; grid-row: 2; }
+        
+        .settings-section { background: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 15px; }
+        .settings-title { color: #2ecc71; margin-top: 0; margin-bottom: 10px; }
+        
+        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #30363d; transition: .4s; border-radius: 34px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: #2ecc71; }
+        input:checked + .toggle-slider:before { transform: translateX(26px); }
     </style>
 </head>
 <body>
@@ -33,6 +50,7 @@
         <button onclick="tab('bots')" id="btn-bots" class="active">BOTLAR</button>
         <button onclick="tab('term')" id="btn-term">KONSOL</button>
         <button onclick="tab('inv')" id="btn-inv">ENVANTER</button>
+        <button onclick="tab('settings')" id="btn-settings">AYARLAR</button>
     </nav>
 
     <div id="tab-bots" class="tab active-tab">
@@ -58,10 +76,66 @@
         <div class="inv-grid" id="inv-box"></div>
     </div>
 
+    <div id="tab-settings" class="tab">
+        <!-- Kazma Modu -->
+        <div class="settings-section">
+            <h3 class="settings-title">🔨 AKILLI KAZMA MODU</h3>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <span>Kazma Modu:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="digging-toggle" onchange="toggleDigging()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span id="digging-status" style="color: #8b949e;">Kapalı</span>
+            </div>
+            <div style="color: #8b949e; font-size: 12px;">
+                Açıldığında bot önündeki bloğu otomatik kıracak. Blok kırılınca duracak.
+            </div>
+        </div>
+
+        <!-- Hareket Kontrolleri -->
+        <div class="settings-section">
+            <h3 class="settings-title">🎮 HAREKET KONTROLLERİ</h3>
+            <div class="movement-controls">
+                <div></div>
+                <button class="movement-btn" onmousedown="startMove('forward')" onmouseup="stopMove('forward')" ontouchstart="startMove('forward')" ontouchend="stopMove('forward')">İLERİ</button>
+                <div></div>
+                <button class="movement-btn" onmousedown="startMove('left')" onmouseup="stopMove('left')" ontouchstart="startMove('left')" ontouchend="stopMove('left')">SOL</button>
+                <button class="movement-btn" onmousedown="startMove('back')" onmouseup="stopMove('back')" ontouchstart="startMove('back')" ontouchend="stopMove('back')">GERİ</button>
+                <button class="movement-btn" onmousedown="startMove('right')" onmouseup="stopMove('right')" ontouchstart="startMove('right')" ontouchend="stopMove('right')">SAĞ</button>
+                <button class="movement-btn" id="btn-jump" onclick="jump()">ZIPLA</button>
+            </div>
+            <div style="color: #8b949e; font-size: 12px; text-align: center; margin-top: 10px;">
+                Tuşlara basılı tutarak hareket ettirebilirsiniz.
+            </div>
+        </div>
+
+        <!-- Ek Ayarlar -->
+        <div class="settings-section">
+            <h3 class="settings-title">⚙️ DİĞER AYARLAR</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <span>Otomatik Yeniden Bağlanma:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="reconnect-toggle" onchange="toggleReconnect()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span>Anti-AFK Modu:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="antiafk-toggle" onchange="toggleAntiAFK()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
     <script>
         if(!localStorage.getItem('sid')) localStorage.setItem('sid', 'sid_'+Math.random().toString(36).substr(2,9));
         const mySID = localStorage.getItem('sid');
         let sel = "";
+        let digInterval = null;
+        let moveInterval = null;
 
         function tab(t) {
             document.querySelectorAll('.tab').forEach(x => x.classList.remove('active-tab'));
@@ -72,12 +146,13 @@
 
         async function add() {
             const h = document.getElementById('h').value, u = document.getElementById('u').value, v = document.getElementById('v').value;
+            if(!h || !u || !v) return alert("Lütfen tüm alanları doldurun!");
             await fetch(`/start?sid=${mySID}&host=${h}&user=${u}&ver=${v}`);
             sel = u; tab('term');
         }
 
         async function doSend(e) {
-            if(e) e.preventDefault(); // Sayfa yenilenmesini engeller
+            if(e) e.preventDefault();
             const i = document.getElementById('m');
             if(!sel || !i.value) return;
             await fetch(`/send?sid=${mySID}&user=${sel}&msg=${encodeURIComponent(i.value)}`);
@@ -89,18 +164,76 @@
                 await fetch(`/update?sid=${mySID}&user=${sel}&type=inv&status=drop&val=${slot}`);
         }
 
+        // KAZMA FONKSİYONLARI
+        async function toggleDigging() {
+            const toggle = document.getElementById('digging-toggle');
+            const status = document.getElementById('digging-status');
+            
+            if(!sel) {
+                alert("Önce bir bot seçin!");
+                toggle.checked = false;
+                return;
+            }
+            
+            if(toggle.checked) {
+                // Kazmayı başlat
+                await fetch(`/dig?sid=${mySID}&user=${sel}&action=start`);
+                status.textContent = "Açık";
+                status.style.color = "#2ecc71";
+            } else {
+                // Kazmayı durdur
+                await fetch(`/dig?sid=${mySID}&user=${sel}&action=stop`);
+                status.textContent = "Kapalı";
+                status.style.color = "#8b949e";
+            }
+        }
+
+        // HAREKET FONKSİYONLARI
+        async function startMove(direction) {
+            if(!sel) return;
+            await fetch(`/control?sid=${mySID}&user=${sel}&direction=${direction}&state=true`);
+        }
+
+        async function stopMove(direction) {
+            if(!sel) return;
+            await fetch(`/control?sid=${mySID}&user=${sel}&direction=${direction}&state=false`);
+        }
+
+        async function jump() {
+            if(!sel) return;
+            // Zıplama için kısa süreli aktivasyon
+            await fetch(`/control?sid=${mySID}&user=${sel}&direction=jump&state=true`);
+            setTimeout(() => {
+                fetch(`/control?sid=${mySID}&user=${sel}&direction=jump&state=false`);
+            }, 200);
+        }
+
+        // DİĞER AYARLAR
+        async function toggleReconnect() {
+            const toggle = document.getElementById('reconnect-toggle');
+            await fetch(`/update?sid=${mySID}&user=${sel}&type=setting&setting=reconnect&value=${toggle.checked}`);
+        }
+
+        async function toggleAntiAFK() {
+            const toggle = document.getElementById('antiafk-toggle');
+            await fetch(`/update?sid=${mySID}&user=${sel}&type=setting&setting=antiafk&value=${toggle.checked}`);
+        }
+
+        // VERİ GÜNCELLEME
         setInterval(async () => {
             try {
                 const r = await fetch(`/data?sid=${mySID}&user=${sel}`);
                 const d = await r.json();
                 
+                // Bot listesini güncelle
                 document.getElementById('list').innerHTML = d.active.map(n => `
-                    <div class="bot-row" style="border-color:${sel==n?'#2ecc71':'#30363d'}" onclick="sel='${n}'">
+                    <div class="bot-row" style="border-color:${sel==n?'#2ecc71':'#30363d'}" onclick="sel='${n}'; updateUI();">
                         <span>${n} ${sel==n?'(SEÇİLİ)':''}</span>
-                        <button class="btn" style="background:#da3633; padding:5px 10px;" onclick="fetch('/stop?sid=${mySID}&user=${n}')">KES</button>
+                        <button class="btn" style="background:#da3633; padding:5px 10px;" onclick="event.stopPropagation(); fetch('/stop?sid=${mySID}&user=${n}')">KES</button>
                     </div>
                 `).join('');
 
+                // Seçili bot varsa verileri güncelle
                 if(sel && d.logs[sel]) {
                     const lb = document.getElementById('logbox');
                     lb.innerHTML = d.logs[sel].join('<br>');
@@ -108,7 +241,7 @@
 
                     if(d.botData[sel]) {
                         const bd = d.botData[sel];
-                        document.getElementById('stats').innerText = `❤️ ${Math.round(bd.hp)} | 🍖 ${Math.round(bd.food)}`;
+                        document.getElementById('stats').innerText = `❤️ ${Math.round(bd.hp || 0)} | 🍖 ${Math.round(bd.food || 0)}`;
                         let invH = "";
                         for(let i=0; i<45; i++) {
                             const it = bd.inv.find(x => x.slot === i);
@@ -121,8 +254,14 @@
                 } else if (sel && !d.active.includes(sel)) {
                     sel = ""; // Bot düştüyse seçimi sıfırla
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error("Veri güncelleme hatası:", e);
+            }
         }, 1000);
+
+        function updateUI() {
+            // UI güncellemeleri burada yapılabilir
+        }
     </script>
 </body>
 </html>
