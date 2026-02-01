@@ -3,19 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite AFK v6</title>
+    <title>Elite AFK v8 (Fixed)</title>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --active: #2ecc71; --blue: #58a6ff; }
-        body { background: var(--bg); color: #c9d1d9; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); }
-        nav button { flex: 1; padding: 15px; border: none; background: none; color: #8b949e; cursor: pointer; font-weight: bold; }
-        nav button.active { color: var(--blue); border-bottom: 3px solid var(--blue); }
+        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --active: #2ecc71; --blue: #58a6ff; --err: #d73a49; }
+        body { background: var(--bg); color: #c9d1d9; font-family: 'Segoe UI', sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        nav button { flex: 1; padding: 15px; border: none; background: none; color: #8b949e; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; }
+        nav button.active { color: var(--blue); border-bottom: 3px solid var(--blue); background: #21262d; }
+        
         .tab-content { flex: 1; display: none; flex-direction: column; padding: 15px; overflow-y: auto; }
         .active-tab { display: flex; }
-        #logbox { flex: 1; background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: monospace; overflow-y: auto; margin-bottom: 10px; line-height: 1.5; }
-        input, select { background: var(--bg); border: 1px solid var(--border); color: white; padding: 12px; border-radius: 8px; margin-bottom: 10px; width: 100%; }
-        .btn-p { background: #238636; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-        .row { background: var(--card); padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
+        
+        #logbox { flex: 1; background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: 'Consolas', monospace; overflow-y: auto; margin-bottom: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+        
+        .m-grid { display: grid; grid-template-columns: repeat(3, 70px); gap: 10px; justify-content: center; margin: 15px 0; }
+        .m-btn { width: 70px; height: 70px; background: var(--card); border: 2px solid var(--border); color: white; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .m-btn.on { background: var(--active); color: #000; box-shadow: 0 0 10px var(--active); border-color: white; }
+        
+        /* Envanter Izgarası */
+        .inv-grid { display: grid; grid-template-columns: repeat(9, 36px); gap: 4px; background: #333; padding: 5px; border-radius: 5px; margin: 0 auto; width: fit-content; }
+        .slot { width: 34px; height: 34px; background: #8b8b8b; border: 1px solid #373737; display: flex; align-items: center; justify-content: center; position: relative; }
+        .slot img { width: 28px; height: 28px; }
+        .count { position: absolute; bottom: 0; right: 0; font-size: 10px; color: white; text-shadow: 1px 1px 0 #000; }
+
+        .row { background: var(--card); border: 1px solid var(--border); padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        
+        input, select { background: var(--bg); border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; margin-bottom: 5px; width: 100%; }
+        .btn-p { background: #238636; color: white; padding: 12px; border: none; border-radius: 6px; width: 100%; font-weight: bold; cursor: pointer; }
+        .btn-red { background: var(--err); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -23,12 +39,13 @@
 <nav>
     <button onclick="T('bots')" id="n-bots" class="active">BOTLAR</button>
     <button onclick="T('chat')" id="n-chat">CHAT</button>
+    <button onclick="T('ctrl')" id="n-ctrl">KONTROL</button>
     <button onclick="T('spam')" id="n-spam">SPAM</button>
 </nav>
 
 <div id="t-bots" class="tab-content active-tab">
-    <div style="display:flex; gap:5px"><input id="host" placeholder="IP"><input id="port" placeholder="25565" style="width:100px"></div>
-    <input id="user" placeholder="Kullanıcı Adı">
+    <div style="display:flex; gap:5px"><input id="host" placeholder="Sunucu IP"><input id="port" placeholder="25565" style="width:100px"></div>
+    <input id="user" placeholder="Bot İsmi">
     <select id="ver"><option value="1.21.1">1.21.1</option><option value="1.20.1">1.20.1</option><option value="1.8.9">1.8.9</option></select>
     <div class="row"><span>Oto-Yeniden Bağlan</span><input type="checkbox" id="ar" style="width:20px; height:20px;"></div>
     <button class="btn-p" onclick="connect()">SİSTEMİ BAŞLAT</button>
@@ -37,21 +54,43 @@
 
 <div id="t-chat" class="tab-content">
     <div id="logbox"></div>
-    <div style="display:flex; gap:5px"><input id="mi" placeholder="Mesaj..."><button class="btn-p" style="width:80px" onclick="sendM()">GÖNDER</button></div>
+    <div style="display:flex; gap:5px">
+        <input id="mi" placeholder="Mesaj yaz..." onkeydown="checkEnter(event)">
+        <button class="btn-p" style="width:80px" onclick="sendM()">GÖNDER</button>
+    </div>
+</div>
+
+<div id="t-ctrl" class="tab-content">
+    <div id="stat" style="text-align:center; margin-bottom:10px; font-weight:bold; color:var(--active);">Veri Yok</div>
+    
+    <div class="m-grid">
+        <div></div><button class="m-btn" id="b-forward" onclick="M('forward')">W</button><div></div>
+        <button class="m-btn" id="b-left" onclick="M('left')">A</button>
+        <button class="m-btn" id="b-jump" onclick="M('jump')">ZIP</button>
+        <button class="m-btn" id="b-right" onclick="M('right')">D</button>
+        <div></div><button class="m-btn" id="b-back" onclick="M('back')">S</button><div></div>
+    </div>
+
+    <div class="inv-grid" id="inv"></div>
 </div>
 
 <div id="t-spam" class="tab-content">
-    <div class="row"><b>SPAM AKTİF</b><input type="checkbox" id="so" onchange="SpT(this.checked)" style="width:20px; height:20px;"></div>
-    <input id="sm" placeholder="Mesaj">
+    <div class="row"><b>SPAM DURUMU</b><input type="checkbox" id="so" onchange="SpT(this.checked)" style="width:20px; height:20px;"></div>
+    <input id="sm" placeholder="Spam metni">
     <input id="sd" type="number" value="5" min="1">
-    <button class="btn-p" onclick="SpA()">EKLE</button>
+    <button class="btn-p" onclick="SpA()">SPAM EKLE</button>
     <div id="slist" style="margin-top:15px"></div>
 </div>
 
 <script>
     const sid = localStorage.getItem('sid') || 's_'+Math.random().toString(36).substr(2,9);
     localStorage.setItem('sid', sid);
-    let sel = "";
+    let sel = "", moves = {};
+    let autoScroll = true;
+
+    // Logbox Scroll Mantığı
+    const lb = document.getElementById('logbox');
+    lb.onscroll = () => { autoScroll = (lb.scrollHeight - lb.scrollTop <= lb.clientHeight + 50); };
 
     function T(n) {
         document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active-tab'));
@@ -59,6 +98,8 @@
         document.getElementById('t-'+n).classList.add('active-tab');
         document.getElementById('n-'+n).classList.add('active');
     }
+
+    function checkEnter(e) { if(e.key === 'Enter') sendM(); }
 
     async function connect() {
         const h=document.getElementById('host').value, p=document.getElementById('port').value, 
@@ -75,22 +116,63 @@
         i.value = "";
     }
 
-    async function SpT(s) { if(!sel) return; await fetch(`/togglespam?sid=${sid}&user=${sel}&state=${s}`); }
+    async function M(d) {
+        if(!sel) return;
+        moves[d] = !moves[d];
+        document.getElementById('b-'+d).classList.toggle('on', moves[d]);
+        await fetch(`/move?sid=${sid}&user=${sel}&dir=${d}&state=${moves[d]}`);
+    }
+
+    async function SpT(s) { if(!sel) return; await fetch(`/tglspam?sid=${sid}&user=${sel}&state=${s}`); }
     async function SpA() {
         const m=document.getElementById('sm').value, d=document.getElementById('sd').value;
         if(!sel || !m) return;
         await fetch(`/addspam?sid=${sid}&user=${sel}&msg=${encodeURIComponent(m)}&delay=${d}`);
+        document.getElementById('sm').value = "";
     }
 
     setInterval(async () => {
         try {
             const r = await fetch(`/data?sid=${sid}&user=${sel}`);
             const d = await r.json();
-            document.getElementById('blist').innerHTML = d.active.map(n => `<div class="row" style="border-color:${sel==n? 'var(--active)':'var(--border)'}" onclick="sel='${n}'"><span>${n}</span></div>`).join('');
+
+            // BOT LİSTESİ VE KES BUTONU DÜZELTİLDİ
+            document.getElementById('blist').innerHTML = d.active.map(n => `
+                <div class="row" style="border-color:${sel==n?'var(--active)':'var(--border)'}" onclick="sel='${n}'">
+                    <span>${n} ${sel==n?'(SEÇİLİ)':''}</span>
+                    <button class="btn-red" onclick="event.stopPropagation(); fetch('/stop?sid=${sid}&user=${n}')">KES</button>
+                </div>
+            `).join('');
+
             if(sel && d.logs[sel]) {
-                const lb = document.getElementById('logbox'); 
-                lb.innerHTML = d.logs[sel].join('<br>'); 
-                lb.scrollTop = lb.scrollHeight;
+                lb.innerHTML = d.logs[sel].join('<br>');
+                if(autoScroll) lb.scrollTop = lb.scrollHeight;
+
+                if(d.botData) {
+                    const b = d.botData;
+                    document.getElementById('stat').innerText = `❤️ ${Math.round(b.hp)} | 🍖 ${Math.round(b.food)}`;
+                    document.getElementById('so').checked = b.spamOn;
+
+                    // ENVANTER HTML OLUŞTURUCU
+                    let invHTML = "";
+                    for(let i=0; i<45; i++) {
+                        const item = b.inv.find(x => x.slot === i);
+                        if(item) {
+                            invHTML += `<div class="slot"><img src="https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.16.1/items/${item.name}.png"><span class="count">${item.count > 1 ? item.count : ''}</span></div>`;
+                        } else {
+                            invHTML += `<div class="slot"></div>`;
+                        }
+                    }
+                    document.getElementById('inv').innerHTML = invHTML;
+
+                    // SPAM LİSTESİ SİL BUTONU
+                    document.getElementById('slist').innerHTML = b.spams.map(s => `
+                        <div class="row">
+                            <span>${s.msg} (${s.delay}s)</span>
+                            <button class="btn-red" onclick="fetch('/delspam?sid=${sid}&user=${sel}&id=${s.id}')">SİL</button>
+                        </div>
+                    `).join('');
+                }
             }
         } catch(e) {}
     }, 1000);
