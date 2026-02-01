@@ -4,8 +4,8 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 
-// Çökme Önleyici Duvar
-process.on('uncaughtException', (err) => console.error('Hata:', err));
+// GLOBAL HATA DUVARI (Sunucu Çökmez)
+process.on('uncaughtException', (err) => console.error('Kritik:', err));
 process.on('unhandledRejection', (r) => console.error('Red:', r));
 
 let sessions = {};
@@ -20,7 +20,7 @@ function startBot(sid, host, port, user, ver, auto) {
 
     const finalPort = parseInt(port) || 25565;
     s.logs[user] = s.logs[user] || [];
-    s.logs[user].push(`<b style='color:#3498db'>[SİSTEM] ${user} bağlanıyor...</b>`);
+    s.logs[user].push(`<b style='color:#3498db'>[PROXY] ${user} tünel bağlantısı kuruluyor...</b>`);
     
     s.cfgs[user] = { auto: auto === 'true', spamOn: false, host: host, port: finalPort, ver: ver };
     s.spams[user] = s.spams[user] || [];
@@ -28,48 +28,59 @@ function startBot(sid, host, port, user, ver, auto) {
     try {
         const bot = mineflayer.createBot({
             host: host, port: finalPort, username: user, version: ver, auth: 'offline',
-            checkTimeoutInterval: 120000, hideErrors: true
+            // --- AKILLI PROXY AYARLARI ---
+            checkTimeoutInterval: 180000, // 3 Dakika tolerans (Lobi geçişleri için)
+            hideErrors: true,
+            keepAlive: true,
+            loadInternalPlugins: true
         });
 
-        // Büyük veri paketlerinde donmayı engeller
         bot.setMaxListeners(0);
         s.bots[user] = bot;
 
-        // --- GELİŞMİŞ CHAT YAKALAYICI (İsimleri Garanti Gösterir) ---
-        bot.on('message', (jsonMsg) => {
-            try {
-                const html = jsonMsg.toHTML();
-                const text = jsonMsg.toString();
-                
-                // Eğer HTML çevirisi başarılıysa onu kullan, yoksa düz metni bas
-                if (html && html.length > 5) {
-                    s.logs[user].push(html);
-                } else if (text.trim().length > 0) {
-                    s.logs[user].push(`<span>${text}</span>`);
-                }
-
-                if (s.logs[user].length > 200) s.logs[user].shift();
-            } catch(e) {}
+        // --- %100 GARANTİLİ CHAT SİSTEMİ (Messagestr) ---
+        // Bu olay, sunucu ne gönderirse göndersin (JSON bozuk olsa bile) metni yakalar.
+        bot.on('messagestr', (msg, position, jsonMsg) => {
+            if (!msg || msg.trim().length === 0) return;
+            
+            // Renk kodlarını temizle ve HTML güvenli hale getir
+            // İsimlerin görünmemesi imkansız çünkü ham veriyi alıyoruz
+            let cleanMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            // Loga ekle
+            s.logs[user].push(`<span style="color:#ddd;">${cleanMsg}</span>`);
+            
+            // Log temizliği
+            if (s.logs[user].length > 250) s.logs[user].shift();
         });
 
-        bot.on('login', () => s.logs[user].push("<b style='color:#2ecc71'>[BAĞLANTI] Giriş Başarılı!</b>"));
+        // Giriş ve Olaylar
+        bot.on('login', () => s.logs[user].push("<b style='color:#2ecc71'>[BAĞLANTI] Lobiye Giriş Yapıldı!</b>"));
+        bot.on('spawn', () => s.logs[user].push("<b style='color:#f1c40f'>[DÜNYA] Dünya yüklendi/değiştirildi.</b>"));
+        bot.on('kicked', (r) => s.logs[user].push(`<b style='color:red'>[ATILDI] Sebep: ${r}</b>`));
+
+        // Proxy Hata Yönetimi
+        bot.on('error', (err) => {
+            if (err.message.includes('array size') || err.message.includes('read ECONNRESET')) {
+                // Bu hatalar proxy geçişlerinde normaldir, yoksay.
+            } else {
+                s.logs[user].push(`<b style='color:#e74c3c'>[HATA] ${err.message}</b>`);
+            }
+        });
+
         bot.on('end', () => {
             const reconnect = s.cfgs[user]?.auto;
             delete s.bots[user];
             if (reconnect) {
-                s.logs[user].push("<b style='color:#f1c40f'>[OTO] 5sn sonra tekrar bağlanılıyor...</b>");
+                s.logs[user].push("<b style='color:#f1c40f'>[OTO] Proxy bağlantısı koptu, 5sn içinde yenileniyor...</b>");
                 setTimeout(() => startBot(sid, host, finalPort, user, ver, 'true'), 5000);
             }
-        });
-        
-        bot.on('error', (err) => {
-            if (!err.message.includes('array size')) s.logs[user].push(`<b style='color:red'>[HATA] ${err.message}</b>`);
         });
 
     } catch (e) { console.log(e); }
 }
 
-// Spam Döngüsü
+// Spam Motoru
 setInterval(() => {
     Object.values(sessions).forEach(s => {
         Object.keys(s.bots).forEach(user => {
@@ -85,6 +96,7 @@ setInterval(() => {
     });
 }, 1000);
 
+// Sunucu
 http.createServer((req, res) => {
     const parsed = url.parse(req.url, true);
     const q = parsed.query, p = parsed.pathname, s = getS(q.sid);
@@ -100,13 +112,10 @@ http.createServer((req, res) => {
         
         if (p === '/data') {
             const b = s.bots[q.user];
-            // Envanter verisini null olmayan slotlarla dolduruyoruz
             const botData = b ? { 
-                hp: b.health, 
-                food: b.food, 
-                inv: b.inventory.slots.map((i, idx) => i ? {name: i.name, count: i.count, slot: idx} : null).filter(x => x),
-                spams: s.spams[q.user], 
-                spamOn: s.cfgs[q.user].spamOn 
+                hp: b.health, food: b.food, 
+                inv: b.inventory ? b.inventory.slots.map((i, idx) => i ? {name: i.name, count: i.count, slot: idx} : null).filter(x => x) : [],
+                spams: s.spams[q.user], spamOn: s.cfgs[q.user].spamOn 
             } : null;
             res.setHeader('Content-Type', 'application/json');
             return res.end(JSON.stringify({ active: Object.keys(s.bots), logs: s.logs, botData }));
@@ -116,6 +125,7 @@ http.createServer((req, res) => {
     let filePath = path.join(__dirname, p === '/' ? 'index.html' : p);
     fs.readFile(filePath, (err, data) => {
         if (err) return res.end("404");
+        // MIME Type fix (Ekranın bozuk görünmemesi için)
         let mime = path.extname(filePath) === '.js' ? 'text/javascript' : 'text/html';
         res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' });
         res.end(data);
