@@ -135,4 +135,4 @@ http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': mime + '; charset=utf-8' });
         res.end(data);
     });
-}).listen(process.
+}).listen(process.env.PORT || 10000);
