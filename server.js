@@ -4,7 +4,9 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 
-process.on('uncaughtException', (err) => console.error('Kritik Hata:', err));
+// Çökme Önleyici Duvar
+process.on('uncaughtException', (err) => console.error('Hata:', err));
+process.on('unhandledRejection', (r) => console.error('Red:', r));
 
 let sessions = {};
 const getS = (sid) => {
@@ -29,45 +31,45 @@ function startBot(sid, host, port, user, ver, auto) {
             checkTimeoutInterval: 120000, hideErrors: true
         });
 
+        // Büyük veri paketlerinde donmayı engeller
         bot.setMaxListeners(0);
         s.bots[user] = bot;
 
-        // OYUNCU İSİMLERİNİ VE TÜM MESAJLARI YAKALAYAN GELİŞMİŞ SİSTEM
+        // --- GELİŞMİŞ CHAT YAKALAYICI (İsimleri Garanti Gösterir) ---
         bot.on('message', (jsonMsg) => {
             try {
-                // Sunucu mesajlarını ve oyuncu chatini HTML formatında yakala
-                let html = jsonMsg.toHTML();
+                const html = jsonMsg.toHTML();
+                const text = jsonMsg.toString();
                 
-                // Eğer toHTML boşsa veya eksikse ham metni al
-                if (!html || html.length < 5) {
-                    html = `<span>${jsonMsg.toString()}</span>`;
+                // Eğer HTML çevirisi başarılıysa onu kullan, yoksa düz metni bas
+                if (html && html.length > 5) {
+                    s.logs[user].push(html);
+                } else if (text.trim().length > 0) {
+                    s.logs[user].push(`<span>${text}</span>`);
                 }
 
-                s.logs[user].push(html);
                 if (s.logs[user].length > 200) s.logs[user].shift();
             } catch(e) {}
         });
 
-        bot.on('login', () => s.logs[user].push("<b style='color:#2ecc71'>[BAĞLANTI] Başarılı!</b>"));
-        
-        bot.on('error', (err) => {
-            if (!err.message.includes('array size')) {
-                s.logs[user].push(`<b style='color:#e74c3c'>[HATA] ${err.message}</b>`);
-            }
-        });
-
+        bot.on('login', () => s.logs[user].push("<b style='color:#2ecc71'>[BAĞLANTI] Giriş Başarılı!</b>"));
         bot.on('end', () => {
             const reconnect = s.cfgs[user]?.auto;
             delete s.bots[user];
             if (reconnect) {
-                s.logs[user].push("<b style='color:#f1c40f'>[OTO] Yeniden bağlanılıyor...</b>");
+                s.logs[user].push("<b style='color:#f1c40f'>[OTO] 5sn sonra tekrar bağlanılıyor...</b>");
                 setTimeout(() => startBot(sid, host, finalPort, user, ver, 'true'), 5000);
             }
         });
-    } catch (e) {}
+        
+        bot.on('error', (err) => {
+            if (!err.message.includes('array size')) s.logs[user].push(`<b style='color:red'>[HATA] ${err.message}</b>`);
+        });
+
+    } catch (e) { console.log(e); }
 }
 
-// Spam Motoru
+// Spam Döngüsü
 setInterval(() => {
     Object.values(sessions).forEach(s => {
         Object.keys(s.bots).forEach(user => {
@@ -83,22 +85,29 @@ setInterval(() => {
     });
 }, 1000);
 
-// Sunucu Başlatma
 http.createServer((req, res) => {
     const parsed = url.parse(req.url, true);
     const q = parsed.query, p = parsed.pathname, s = getS(q.sid);
 
     try {
         if (p === '/start') { startBot(q.sid, q.host, q.port, q.user, q.ver, q.auto); return res.end("1"); }
+        if (p === '/stop') { if(s.bots[q.user]) { s.bots[q.user].quit(); s.cfgs[q.user].auto = false; } return res.end("1"); }
         if (p === '/send') { if(s.bots[q.user]) s.bots[q.user].chat(decodeURIComponent(q.msg)); return res.end("1"); }
+        if (p === '/move') { if(s.bots[q.user]) s.bots[q.user].setControlState(q.dir, q.state === 'true'); return res.end("1"); }
         if (p === '/tglspam') { s.cfgs[q.user].spamOn = (q.state === 'true'); return res.end("1"); }
-        if (p === '/addspam') { 
-            s.spams[q.user].push({ id: Date.now(), msg: decodeURIComponent(q.msg), delay: parseInt(q.delay), last: 0 }); 
-            return res.end("1"); 
-        }
+        if (p === '/addspam') { s.spams[q.user].push({ id: Date.now(), msg: decodeURIComponent(q.msg), delay: parseInt(q.delay), last: 0 }); return res.end("1"); }
+        if (p === '/delspam') { s.spams[q.user] = s.spams[q.user].filter(x => x.id != q.id); return res.end("1"); }
+        
         if (p === '/data') {
             const b = s.bots[q.user];
-            const botData = b ? { hp: b.health, food: b.food, spams: s.spams[q.user], spamOn: s.cfgs[q.user].spamOn } : null;
+            // Envanter verisini null olmayan slotlarla dolduruyoruz
+            const botData = b ? { 
+                hp: b.health, 
+                food: b.food, 
+                inv: b.inventory.slots.map((i, idx) => i ? {name: i.name, count: i.count, slot: idx} : null).filter(x => x),
+                spams: s.spams[q.user], 
+                spamOn: s.cfgs[q.user].spamOn 
+            } : null;
             res.setHeader('Content-Type', 'application/json');
             return res.end(JSON.stringify({ active: Object.keys(s.bots), logs: s.logs, botData }));
         }
