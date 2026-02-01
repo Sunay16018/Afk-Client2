@@ -1,7 +1,6 @@
 {
-  "name": "botmaster-elite-pro",
-  "version": "2.0.0",
-  "description": "Professional Minecraft AFK Management System",
+  "name": "botmaster-ultimate",
+  "version": "3.0.0",
   "main": "server.js",
   "dependencies": {
     "mineflayer": "^4.22.0",
