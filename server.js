@@ -5,13 +5,11 @@ const url = require('url');
 const fs = require('fs');
 const path = require('path');
 
-// --- HATA KALKANI (SİSTEMİN ÇÖKMESİNİ ENGELLER) ---
-process.on('uncaughtException', (e) => console.log(' [Kritik Hata Yutuldu]:', e.message));
-process.on('unhandledRejection', (e) => console.log(' [Promise Hatası Yutuldu]:', e.message));
+// Sistem çökmelerini engelle ama logla
+process.on('uncaughtException', (e) => console.log('[SİSTEM]:', e.message));
+process.on('unhandledRejection', (e) => console.log('[RED]:', e.message));
 
 let sessions = {};
-
-// Kullanıcı verilerini ve logları hafızada tut
 const getS = (sid) => {
     if (!sessions[sid]) sessions[sid] = { bots: {}, logs: {}, cfgs: {} };
     return sessions[sid];
@@ -19,147 +17,101 @@ const getS = (sid) => {
 
 function startBot(sid, host, port, user, ver, auto) {
     const s = getS(sid);
-    if (s.bots[user]) return; // Zaten varsa tekrar başlatma
+    if (s.bots[user]) return;
 
-    // LOG EKLEME FONKSİYONU
+    // --- ESKİ SAĞLAM PROXY AYARLARI ---
+    const bot = mineflayer.createBot({
+        host: host,
+        port: parseInt(port) || 25565,
+        username: user,
+        version: ver,
+        auth: 'offline',
+        checkTimeoutInterval: 90000, // 90 Saniye (En stabil ayar budur)
+        keepAlive: true,             // Bağlantıyı canlı tut
+        hideErrors: true
+    });
+
+    bot.loadPlugin(pathfinder);
+    s.bots[user] = bot;
+    s.logs[user] = s.logs[user] || [];
+    s.cfgs[user] = { auto: auto === 'true', host, port, ver };
+
     const log = (msg, color = "#8b949e") => {
-        const time = new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-        s.logs[user] = s.logs[user] || [];
-        s.logs[user].push(`<div style="color:${color}; border-bottom:1px solid #21262d; padding:2px;">[${time}] ${msg}</div>`);
-        if (s.logs[user].length > 3000) s.logs[user].shift(); // Hafıza şişmesin diye 3000 satır sınır
+        const time = new Date().toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit'});
+        s.logs[user].push(`<div style="color:${color}; border-bottom:1px solid #21262d;">[${time}] ${msg}</div>`);
+        if (s.logs[user].length > 2000) s.logs[user].shift();
     };
 
-    log(`<b>[BAŞLATILIYOR]</b> ${user} sunucuya bağlanıyor...`, "#58a6ff");
+    bot.on('inject_allowed', () => {
+        const mcData = require('minecraft-data')(bot.version);
+        const movements = new Movements(bot, mcData);
+        movements.canDig = false;
+        bot.pathfinder.setMovements(movements);
+    });
 
-    try {
-        const bot = mineflayer.createBot({
-            host: host,
-            port: parseInt(port) || 25565,
-            username: user,
-            version: ver,
-            auth: 'offline',
-            checkTimeoutInterval: 180000, // 3 Dakika! (Proxy geçişlerinde asla düşmez)
-            keepAlive: true,
-            hideErrors: true
-        });
-
-        bot.loadPlugin(pathfinder);
-        s.bots[user] = bot;
-        s.cfgs[user] = { auto: auto === 'true', host, port, ver };
-
-        bot.on('inject_allowed', () => {
-            const mcData = require('minecraft-data')(bot.version);
-            const movements = new Movements(bot, mcData);
-            movements.canDig = false; // Ban yememek için kazmayı kapat
-            movements.allowSprinting = true;
-            bot.pathfinder.setMovements(movements);
-        });
-
-        // --- ULTRA GELİŞMİŞ "HAYALET" ANTİ-AFK ---
-        function humanBehavior() {
-            if (!bot.entity) return;
-            
-            const action = Math.random();
-            // %40 İhtimalle etrafa bak (Head Rotation)
-            if (action < 0.4) {
-                const yaw = Math.random() * Math.PI * 2;
-                const pitch = (Math.random() - 0.5) * 0.5;
-                bot.look(yaw, pitch, false);
-            } 
-            // %30 İhtimalle Zıpla
-            else if (action < 0.7) {
-                bot.setControlState('jump', true);
-                setTimeout(() => bot.setControlState('jump', false), 250);
-            } 
-            // %20 İhtimalle Eğil/Kalk (Sneak) - Bu en güvenlisidir
-            else if (action < 0.9) {
-                bot.setControlState('sneak', true);
-                setTimeout(() => bot.setControlState('sneak', false), 1500);
-            } 
-            // %10 İhtimalle El Salla (Swing Arm)
-            else {
-                bot.swingArm('right');
-            }
-
-            // Bir sonraki hareket 30sn ile 90sn arasında rastgele bir zamanda
-            // Sabit süre olmadığı için bot korumaları algılayamaz.
-            setTimeout(humanBehavior, 30000 + Math.random() * 60000);
-        }
-        
-        bot.on('spawn', () => {
-            log("<b>[GİRİŞ]</b> Dünya yüklendi, Anti-AFK aktif.", "#238636");
-            setTimeout(humanBehavior, 10000); // 10sn sonra başla
-        });
-
-        bot.on('message', (json) => {
-            try { log(json.toHTML(), "#c9d1d9"); } 
-            catch { log(json.toString(), "#c9d1d9"); }
-        });
-
-        bot.on('kicked', (reason) => log(`<b>[ATILDI]</b> Sebep: ${reason}`, "#da3633"));
-        
-        bot.on('error', (err) => {
-            log(`<b>[HATA]</b> Ağ hatası: ${err.message}`, "#da3633");
-            // Hata olsa bile 'end' tetikleneceği için reconnect orada çalışır
-        });
-
-        bot.on('end', (reason) => {
-            const reconnect = s.cfgs[user]?.auto;
-            delete s.bots[user];
-            log(`<b>[BAĞLANTI KOPTU]</b> ${reason}`, "#d29922");
-            
-            if (reconnect) {
-                log(`<b>[OTO-TEKRAR]</b> 15 saniye içinde yeniden bağlanılıyor...`, "#58a6ff");
-                setTimeout(() => startBot(sid, host, port, user, ver, 'true'), 15000);
-            }
-        });
-
-    } catch (e) {
-        log(`<b>[SİSTEM HATASI]</b> Bot başlatılamadı: ${e.message}`, "red");
+    // --- ANTİ-AFK (İNSANSI) ---
+    function humanIdle() {
+        if (!bot.entity) return;
+        const r = Math.random();
+        if (r < 0.5) bot.look(Math.random()*6.28, (Math.random()-0.5)*0.5); // Bakış
+        else if (r < 0.8) { bot.setControlState('jump', true); setTimeout(()=>bot.setControlState('jump', false), 250); } // Zıpla
+        else { bot.swingArm('right'); } // El salla
+        setTimeout(humanIdle, 30000 + Math.random() * 60000);
     }
+    
+    bot.on('spawn', () => {
+        log("<b>[GİRİŞ]</b> Sunucuya girildi.", "#2ecc71");
+        setTimeout(humanIdle, 15000);
+    });
+
+    bot.on('message', (json) => {
+        try { log(json.toHTML()); } catch { log(json.toString()); }
+    });
+
+    bot.on('end', (reason) => {
+        const reconnect = s.cfgs[user]?.auto;
+        delete s.bots[user];
+        log(`<b>[KOPTU]</b> ${reason}`, "#e74c3c");
+        if (reconnect) {
+            log("<b>[OTO]</b> 10sn sonra tekrar bağlanılıyor...", "#f1c40f");
+            setTimeout(() => startBot(sid, host, port, user, ver, 'true'), 10000);
+        }
+    });
+
+    bot.on('error', (err) => log(`[HATA] ${err.message}`, "#e74c3c"));
 }
 
-// --- WEB SUNUCUSU ---
 http.createServer((req, res) => {
-    const parsed = url.parse(req.url, true);
-    const q = parsed.query, p = parsed.pathname, s = getS(q.sid);
+    const q = url.parse(req.url, true).query;
+    const p = url.parse(req.url, true).pathname;
+    const s = getS(q.sid);
     const b = s.bots[q.user];
 
-    // API Endpointleri
     if (p === '/start') { startBot(q.sid, q.host, q.port, q.user, q.ver, q.auto); return res.end("OK"); }
-    if (p === '/stop') { if(b) { s.cfgs[q.user].auto = false; b.quit(); } return res.end("OK"); }
     if (p === '/send') { if(b) b.chat(decodeURIComponent(q.msg)); return res.end("OK"); }
     if (p === '/goto') { 
-        if(b) {
-            const goal = new goals.GoalBlock(parseInt(q.x), parseInt(q.y), parseInt(q.z));
-            b.pathfinder.setGoal(goal);
-        }
+        if(b) b.pathfinder.setGoal(new goals.GoalBlock(parseInt(q.x), parseInt(q.y), parseInt(q.z)));
         return res.end("OK"); 
     }
     if (p === '/drop') {
-        if(b) {
-            const item = b.inventory.slots[parseInt(q.slot)];
-            if(item) b.tossStack(item);
-        }
+        if(b && b.inventory.slots[parseInt(q.slot)]) b.tossStack(b.inventory.slots[parseInt(q.slot)]);
         return res.end("OK");
     }
     if (p === '/data') {
         res.setHeader('Content-Type', 'application/json');
+        // Kordinat verisi burada ekleniyor (pos)
+        const pos = b && b.entity ? b.entity.position : null;
         return res.end(JSON.stringify({
             active: Object.keys(s.bots),
             logs: s.logs,
             botData: b ? { 
-                hp: b.health, food: b.food, 
+                hp: b.health, 
+                food: b.food,
+                pos: pos ? {x: Math.floor(pos.x), y: Math.floor(pos.y), z: Math.floor(pos.z)} : null,
                 inv: b.inventory.slots.map((i, idx) => i ? {name: i.name, count: i.count, slot: idx} : null).filter(x => x)
             } : null
         }));
     }
 
-    // HTML Dosyasını Oku
-    fs.readFile(path.join(__dirname, p === '/' ? 'index.html' : p), (err, data) => {
-        if (err) return res.end("404 Not Found");
-        res.end(data);
-    });
-
+    fs.readFile(path.join(__dirname, p === '/' ? 'index.html' : p), (err, data) => res.end(data || "404"));
 }).listen(process.env.PORT || 10000);
-    
