@@ -3,90 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Ultimate Bot Panel v13</title>
+    <title>Elite Stealth Panel v25</title>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --act: #2ecc71; --blue: #58a6ff; --red: #da3633; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); color: #c9d1d9; font-family: -apple-system, system-ui, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        :root { --bg: #010409; --panel: #0d1117; --border: #30363d; --blue: #58a6ff; --green: #238636; }
+        * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
+        body { background: var(--bg); color: #c9d1d9; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         
-        nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; }
-        nav button { flex: 1; padding: 15px 5px; border: none; background: none; color: #8b949e; font-weight: bold; font-size: 11px; cursor: pointer; text-transform: uppercase; }
-        nav button.active { color: var(--blue); border-bottom: 2px solid var(--blue); background: #1c2128; }
+        nav { display: flex; background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        nav button { flex: 1; padding: 18px 5px; border: none; background: none; color: #8b949e; font-weight: bold; font-size: 12px; cursor: pointer; }
+        nav button.active { color: var(--blue); border-bottom: 3px solid var(--blue); background: #161b22; }
 
-        .tab { flex: 1; display: none; padding: 12px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .tab { flex: 1; display: none; padding: 15px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .active-tab { display: block; }
 
-        #logbox { background: #000; height: 55vh; overflow-y: auto; padding: 10px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; line-height: 1.5; font-family: 'Consolas', monospace; word-break: break-all; }
+        #logbox { background: #000; height: 55vh; overflow-y: auto; padding: 12px; font-size: 13px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 12px; line-height: 1.6; font-family: 'SFMono-Regular', Consolas, monospace; }
         
-        input, select { background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 8px; font-size: 16px; outline: none; }
-        .btn { background: #238636; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        
-        .m-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 180px; margin: 15px auto; }
-        .m-btn { aspect-ratio: 1; background: var(--card); border: 1px solid var(--border); color: white; border-radius: 12px; font-weight: bold; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .m-btn.on { background: var(--act); color: #000; border-color: #fff; }
+        input, select { background: var(--panel); border: 1px solid var(--border); color: #fff; padding: 14px; border-radius: 10px; width: 100%; margin-bottom: 10px; font-size: 16px; outline: none; }
+        .btn { background: var(--green); color: #fff; border: none; padding: 16px; width: 100%; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: filter 0.2s; }
+        .btn:active { filter: brightness(1.2); }
+
+        .coord-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+        .coord-grid input { text-align: center; margin-bottom: 0; }
 
         .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-        .slot { background: #1c2128; border: 1px solid #444c56; aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; }
-        .slot img { width: 80%; }
-        .count { position: absolute; bottom: 1px; right: 2px; font-size: 10px; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000; }
+        .slot { background: #161b22; border: 1px solid var(--border); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; border-radius: 8px; }
+        .slot img { width: 85%; }
+        .count { position: absolute; bottom: 2px; right: 3px; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 0 4px; border-radius: 4px; }
 
-        .bot-list-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border); }
+        .status-bar { display: flex; justify-content: space-around; background: var(--panel); padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--border); font-weight: bold; font-size: 14px; }
     </style>
 </head>
 <body>
 
 <nav>
     <button onclick="T('bot')" id="n-bot" class="active">BAĞLANTI</button>
-    <button onclick="T('chat')" id="n-chat">CHAT/GECE</button>
-    <button onclick="T('ctrl')" id="n-ctrl">KONTROL</button>
-    <button onclick="T('inv')" id="n-inv">ÇANTA</button>
+    <button onclick="T('chat')" id="n-chat">GECE LOGLARI</button>
+    <button onclick="T('ctrl')" id="n-ctrl">KONTROL/ENV</button>
 </nav>
 
 <div id="t-bot" class="tab active-tab">
-    <input id="host" placeholder="Sunucu IP">
-    <input id="user" placeholder="Bot İsmi">
+    <input id="host" placeholder="Server IP Adresi">
+    <input id="user" placeholder="Bot Kullanıcı Adı">
     <select id="ver">
         <option value="1.20.1">1.20.1</option>
         <option value="1.8.9">1.8.9</option>
         <option value="1.21.1">1.21.1</option>
     </select>
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; background:var(--card); padding:12px; border-radius:8px;">
-        <span style="flex:1; font-size:14px; color:#8b949e;">Oto-Bağlan (Proxy Koruma)</span>
-        <input type="checkbox" id="ar" checked style="width:22px; height:22px;">
-    </div>
-    <button class="btn" onclick="start()">SİSTEMİ BAŞLAT</button>
+    <button class="btn" onclick="start()">BOTU SİSTEME SOK</button>
     <div id="blist" style="margin-top:20px"></div>
 </div>
 
 <div id="t-chat" class="tab">
     <div id="logbox"></div>
     <div style="display:flex; gap:8px;">
-        <input id="mi" placeholder="Mesaj veya /goto x y z" onkeydown="if(event.key==='Enter') send()" style="margin:0;">
-        <button onclick="send()" style="background:var(--blue); border:none; color:white; border-radius:8px; width:60px; font-size:18px;">➤</button>
+        <input id="mi" placeholder="Sunucuya mesaj gönder..." onkeydown="if(event.key==='Enter') send()" style="margin:0;">
+        <button onclick="send()" style="background:var(--blue); border:none; color:white; border-radius:10px; width:65px; font-size:22px;">➤</button>
     </div>
 </div>
 
 <div id="t-ctrl" class="tab">
-    <div id="stat" style="text-align:center; font-weight:bold; color:var(--act); margin-bottom:15px; font-size:16px;"></div>
-    <div class="m-grid">
-        <div></div><button class="m-btn" id="b-forward" onclick="M('forward')">W</button><div></div>
-        <button class="m-btn" id="b-left" onclick="M('left')">A</button>
-        <button class="m-btn" id="b-jump" onclick="M('jump')">Z</button>
-        <button class="m-btn" id="b-right" onclick="M('right')">D</button>
-        <div></div><button class="m-btn" id="b-back" onclick="M('back')">S</button><div></div>
+    <div class="status-bar" id="stat_display">
+        <span>❤️ CAN: --</span>
+        <span>🍖 AÇLIK: --</span>
     </div>
-    <p style="text-align:center; font-size:11px; color:#8b949e; line-height:1.4;">Z butonu zıplatır. Arka planda "İnsansı AFK" (bakış ve rastgele zıplama) adminlere karşı botu korur.</p>
-</div>
+    
+    <label style="color:var(--blue); font-size:12px; font-weight:bold; margin-bottom:5px; display:block;">AKILLI YOL BULMA (COORDS)</label>
+    <div class="coord-grid">
+        <input id="cx" type="number" placeholder="X">
+        <input id="cy" type="number" placeholder="Y">
+        <input id="cz" type="number" placeholder="Z">
+    </div>
+    <button class="btn" style="background:var(--blue); margin-bottom:25px;" onclick="goTo()">HEDEFE YÜRÜ</button>
 
-<div id="t-inv" class="tab">
+    <label style="color:var(--blue); font-size:12px; font-weight:bold; margin-bottom:5px; display:block;">ÇANTA İÇERİĞİ (ATMAK İÇİN TIKLA)</label>
     <div class="inv-grid" id="inv-display"></div>
-    <p style="text-align:center; font-size:12px; color:#8b949e; margin-top:20px;">Eşyaya dokunursan o slottaki her şeyi yere atar.</p>
 </div>
 
 <script>
     let sid = localStorage.getItem('bot_sid') || 's_'+Math.random().toString(36).substr(2,9);
     localStorage.setItem('bot_sid', sid);
-    let sel = "", moves = {}, lastLogLen = 0;
+    let sel = "";
 
     function T(t){
         document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active-tab'));
@@ -95,26 +91,23 @@
         document.getElementById('n-'+t).classList.add('active');
     }
 
-    async function start(){
-        const h=document.getElementById('host').value, u=document.getElementById('user').value, 
-              v=document.getElementById('ver').value, a=document.getElementById('ar').checked;
-        if(!h || !u) return;
-        await fetch(`/start?sid=${sid}&host=${h}&user=${u}&ver=${v}&auto=${a}`);
+    function start(){
+        const h=document.getElementById('host').value, u=document.getElementById('user').value, v=document.getElementById('ver').value;
+        if(!h || !u) return alert("Bilgileri doldur!");
+        fetch(`/start?sid=${sid}&host=${h}&user=${u}&ver=${v}&auto=true`);
         sel = u; T('chat');
     }
 
-    async function send(){
+    function send(){
         const i=document.getElementById('mi');
         if(!i.value || !sel) return;
-        await fetch(`/send?sid=${sid}&user=${sel}&msg=${encodeURIComponent(i.value)}`);
+        fetch(`/send?sid=${sid}&user=${sel}&msg=${encodeURIComponent(i.value)}`);
         i.value="";
     }
 
-    async function M(d) {
-        if(!sel) return;
-        moves[d] = !moves[d];
-        document.getElementById('b-'+d).classList.toggle('on', moves[d]);
-        await fetch(`/move?sid=${sid}&user=${sel}&dir=${d}&state=${moves[d]}`);
+    function goTo(){
+        const x=document.getElementById('cx').value, y=document.getElementById('cy').value, z=document.getElementById('cz').value;
+        if(x && y && z) fetch(`/goto?sid=${sid}&user=${sel}&x=${x}&y=${y}&z=${z}`);
     }
 
     setInterval(async ()=>{
@@ -123,23 +116,22 @@
             const d = await r.json();
             
             document.getElementById('blist').innerHTML = d.active.map(n=>`
-                <div class="bot-list-item" style="border-color:${sel==n? 'var(--blue)':'var(--border)'}" onclick="sel='${n}'">
-                    <span><b>${n}</b></span>
-                    <button onclick="event.stopPropagation(); fetch('/stop?sid=${sid}&user=${n}')" style="background:var(--red); color:white; border:none; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:bold;">DURDUR</button>
+                <div onclick="sel='${n}'" style="padding:15px; background:var(--panel); border-radius:12px; margin-bottom:10px; border:2px solid ${sel==n?var(--blue):var(--border)}">
+                    <b>${n}</b> <span style="float:right">${sel==n?'🔵 SEÇİLDİ':'⚪ BOŞTA'}</span>
                 </div>
             `).join('');
 
             if(sel && d.logs[sel]) {
                 const lb = document.getElementById('logbox');
-                if(d.logs[sel].length !== lastLogLen) {
-                    lb.innerHTML = d.logs[sel].join('<br>');
-                    lb.scrollTop = lb.scrollHeight;
-                    lastLogLen = d.logs[sel].length;
-                }
+                lb.innerHTML = d.logs[sel].join('');
+                lb.scrollTop = lb.scrollHeight;
+                
                 if(d.botData){
-                    const bd = d.botData;
-                    document.getElementById('stat').innerText = `❤ CAN: %${Math.round(bd.hp*5)} | 🍖 AÇLIK: ${Math.round(bd.food)}`;
-                    document.getElementById('inv-display').innerHTML = bd.inv.map(i=>`
+                    document.getElementById('stat_display').innerHTML = `
+                        <span style="color:#ff7b72">❤️ CAN: %${Math.round(d.botData.hp*5)}</span>
+                        <span style="color:#d2a8ff">🍖 AÇLIK: ${Math.round(d.botData.food)}</span>
+                    `;
+                    document.getElementById('inv-display').innerHTML = d.botData.inv.map(i=>`
                         <div class="slot" onclick="fetch('/drop?sid=${sid}&user=${sel}&slot=${i.slot}')">
                             <img src="https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.16.1/items/${i.name}.png" onerror="this.src='https://via.placeholder.com/32?text=?'">
                             <span class="count">${i.count}</span>
