@@ -1,6 +1,6 @@
 {
-  "name": "immortal-bot-system",
-  "version": "100.0.0",
+  "name": "legendary-bot-v3",
+  "version": "1.0.0",
   "main": "server.js",
   "dependencies": {
     "mineflayer": "^4.22.0",
