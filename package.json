@@ -1,6 +1,6 @@
 {
-  "name": "god-mode-bot",
-  "version": "99.9.9",
+  "name": "immortal-bot-pro",
+  "version": "100.0.0",
   "main": "server.js",
   "dependencies": {
     "mineflayer": "^4.22.0",
