@@ -3,161 +3,201 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const autoEat = require('mineflayer-auto-eat').plugin;
 const pvp = require('mineflayer-pvp').plugin;
 const armorManager = require('mineflayer-armor-manager');
-const toolPlugin = require('mineflayer-tool').plugin;
-const webInventory = require('mineflayer-web-inventory');
+const collectBlock = require('mineflayer-collectblock').plugin;
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const chalk = require('chalk');
-const moment = require('moment');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const bots = {};
+// Çökme Engelleyici
+process.on('uncaughtException', (e) => console.log(' [HATA YUTULDU]:', e.message));
 
-// Hata Yönetimi (Sistem Kapanmasın)
-process.on('uncaughtException', (e) => console.log(chalk.red('[KRITIK_HATA]'), e.message));
+let bots = {}; // Aktif botlar
 
-function createBot(data) {
-    if (bots[data.user]) return;
-
-    console.log(chalk.cyan(`[SİSTEM] ${data.user} başlatılıyor...`));
-
-    const bot = mineflayer.createBot({
-        host: data.host,
-        port: parseInt(data.port) || 25565,
-        username: data.user,
-        version: data.ver,
-        auth: 'offline',
-        checkTimeoutInterval: 120000,
-        keepAlive: true
-    });
-
-    // Plugin Yüklemeleri
-    bot.loadPlugin(pathfinder);
-    bot.loadPlugin(autoEat);
-    bot.loadPlugin(pvp);
-    bot.loadPlugin(armorManager);
-    bot.loadPlugin(toolPlugin);
-
-    bot.cfg = { ...data, auto: true };
-    bots[data.user] = bot;
-
-    const sendLog = (msg, color = '#8b949e') => {
-        const time = moment().format('HH:mm:ss');
-        io.emit('bot_log', { 
-            user: data.user, 
-            html: `<div style="color:${color}; border-bottom:1px solid #21262d; padding:2px;">[${time}] ${msg}</div>` 
-        });
-    };
-
-    bot.once('spawn', () => {
-        sendLog(`Bağlantı başarılı! God-Mode modülleri aktif.`, '#238636');
-        
-        const mcData = require('minecraft-data')(bot.version);
-        const movements = new Movements(bot, mcData);
-        
-        // HIZLI HAREKET AYARLARI
-        movements.allowSprinting = true;
-        movements.allowParkour = true;
-        movements.canDig = false;
-        bot.pathfinder.setMovements(movements);
-
-        // OTO YEMEK AYARLARI
-        bot.autoEat.options = { priority: 'foodPoints', startAt: 14, bannedFood: [] };
-        
-        // Web Envanter (İsteğe bağlı port: 3000 + bot sayısı)
-        // webInventory(bot, { port: 3000 + Object.keys(bots).length });
-    });
-
-    bot.on('health', () => {
-        if (bot.food < 15) bot.autoEat.eat();
-    });
-
-    bot.on('messagestr', (msg) => sendLog(msg));
-
-    // OTOMATİK SAVUNMA (PVP)
-    bot.on('attacked', (entity) => {
-        if (entity.type === 'player' || entity.type === 'mob') {
-            bot.pvp.attack(entity);
-            sendLog(`Saldırı algılandı! Karşılık veriliyor: ${entity.name || entity.type}`, '#da3633');
-        }
-    });
-
-    // PES ETMEME (AUTO-RECONNECT)
-    bot.on('end', (reason) => {
-        sendLog(`Bağlantı kesildi: ${reason}`, '#f1c40f');
-        const user = bot.username;
-        const cfg = bot.cfg;
-        delete bots[user];
-        io.emit('update_list', Object.keys(bots));
-
-        if (cfg.auto) {
-            sendLog(`10 saniye içinde yeniden bağlanılıyor...`, '#58a6ff');
-            setTimeout(() => createBot(cfg), 10000);
-        }
-    });
-
-    bot.on('error', (err) => sendLog(`Hata: ${err.message}`, '#da3633'));
-    
-    io.emit('update_list', Object.keys(bots));
-}
-
-// Socket İletişimi
+// --- WEBSOCKET BAĞLANTISI ---
 io.on('connection', (socket) => {
-    socket.emit('update_list', Object.keys(bots));
+    console.log('Panel bağlandı:', socket.id);
 
-    socket.on('start_bot', (data) => createBot(data));
+    // Bot Başlatma İsteği
+    socket.on('startBot', (data) => {
+        if (bots[data.user]) return; // Zaten varsa açma
+        createBot(data, socket);
+    });
 
-    socket.on('stop_bot', (user) => {
+    // Botu Öldür/Kapat
+    socket.on('stopBot', (user) => {
         if (bots[user]) {
-            bots[user].cfg.auto = false;
+            bots[user].cfg.auto = false; // Yeniden girmesin
             bots[user].quit();
             delete bots[user];
-            io.emit('update_list', Object.keys(bots));
+            io.emit('botList', Object.keys(bots));
         }
     });
 
-    socket.on('send_chat', (data) => {
+    // Chat Mesajı
+    socket.on('chat', (data) => {
         if (bots[data.user]) bots[data.user].chat(data.msg);
     });
 
-    socket.on('move_bot', (data) => {
+    // Hareket Komutları
+    socket.on('move', (data) => {
         const b = bots[data.user];
         if (b) {
-            b.pathfinder.setGoal(null);
+            b.pathfinder.setGoal(null); // Otoyürüyüşü iptal et
             b.setControlState(data.dir, data.state);
         }
     });
 
-    socket.on('goto_coord', (data) => {
+    // Spam Başlat/Durdur
+    socket.on('spam', (data) => {
+        const b = bots[data.user];
+        if (!b) return;
+        if (data.state) {
+            if (b.spamTask) clearInterval(b.spamTask);
+            b.spamTask = setInterval(() => {
+                b.chat(data.msg + " " + Math.floor(Math.random() * 999));
+            }, data.delay);
+        } else {
+            if (b.spamTask) clearInterval(b.spamTask);
+        }
+    });
+
+    // Goto (Koordinat)
+    socket.on('goto', (data) => {
         const b = bots[data.user];
         if (b) {
-            b.pathfinder.setGoal(new goals.GoalBlock(data.x, data.y, data.z));
+            const goal = new goals.GoalBlock(Number(data.x), Number(data.y), Number(data.z));
+            b.pathfinder.setGoal(goal);
+        }
+    });
+    
+    // Envanter Drop
+    socket.on('drop', (data) => {
+        const b = bots[data.user];
+        if (b && b.inventory.slots[data.slot]) {
+            b.tossStack(b.inventory.slots[data.slot]);
         }
     });
 });
 
-// Canlı Veri Döngüsü
+// --- BOT OLUŞTURMA FONKSİYONU ---
+function createBot(cfg, socket) {
+    const bot = mineflayer.createBot({
+        host: cfg.host,
+        port: parseInt(cfg.port),
+        username: cfg.user,
+        version: cfg.ver,
+        auth: 'offline',
+        checkTimeoutInterval: 120000, // 2 Dakika
+        keepAlive: true,
+        hideErrors: true
+    });
+
+    // Pluginleri Yükle
+    bot.loadPlugin(pathfinder);
+    bot.loadPlugin(autoEat);
+    bot.loadPlugin(pvp);
+    bot.loadPlugin(armorManager);
+    bot.loadPlugin(collectBlock);
+
+    // Bot Ayarlarını Kaydet
+    bot.cfg = cfg;
+    bots[cfg.user] = bot;
+    io.emit('botList', Object.keys(bots));
+
+    const log = (msg, color = '#8b949e') => {
+        const time = new Date().toLocaleTimeString('tr-TR');
+        io.emit('log', { user: cfg.user, html: `<div style="color:${color}; border-bottom:1px solid #333;">[${time}] ${msg}</div>` });
+    };
+
+    bot.once('spawn', () => {
+        log('Sunucuya giriş yapıldı. God Mode modüller yükleniyor...', '#2ecc71');
+        
+        // Hareket Ayarları
+        const mcData = require('minecraft-data')(bot.version);
+        const movements = new Movements(bot, mcData);
+        movements.canDig = false;
+        movements.allowSprinting = true;
+        movements.allowParkour = true;
+        bot.pathfinder.setMovements(movements);
+
+        // Auto Eat Ayarları
+        bot.autoEat.options = { priority: 'foodPoints', startAt: 15, bannedFood: [] };
+        
+        // Armor Manager (Otomatik Zırh Giy)
+        bot.armorManager.equipAll();
+
+        // İnsansı Anti-AFK
+        startAntiAfk(bot);
+    });
+
+    // Eventler
+    bot.on('autoeat_started', () => log('Otomatik yemek yeniyor...', '#f1c40f'));
+    bot.on('playerCollect', (collector, item) => { if(collector === bot.entity) log('Eşya toplandı.', '#58a6ff'); });
+    bot.on('kicked', (reason) => log(`Atıldı: ${reason}`, '#da3633'));
+    bot.on('message', (m) => log(m.toHTML ? m.toHTML() : m.toString()));
+    
+    // ÖLÜNCE YENİDEN DOĞ
+    bot.on('death', () => {
+        log('Bot öldü! Yeniden doğuluyor...', '#da3633');
+        // Mineflayer otomatik respawn atar genelde ama biz garantiye alalım
+    });
+
+    // PVP: Biri vurursa karşılık ver (Basit Koruma)
+    bot.on('onCorrelateAttack', (attacker, victim, weapon) => {
+        if (victim === bot.entity) {
+            bot.pvp.attack(attacker);
+        }
+    });
+
+    // BAĞLANTI KOPARSA (RECONNECT)
+    bot.on('end', (reason) => {
+        log(`Bağlantı koptu: ${reason}`, '#da3633');
+        delete bots[cfg.user];
+        io.emit('botList', Object.keys(bots));
+
+        if (cfg.auto) {
+            log('10 saniye içinde tekrar bağlanılıyor...', '#e67e22');
+            setTimeout(() => createBot(cfg, socket), 10000);
+        }
+    });
+    
+    bot.on('error', (err) => log(`Hata: ${err.message}`, '#da3633'));
+}
+
+// İnsansı Anti-AFK
+function startAntiAfk(bot) {
+    if(!bot.entity) return;
+    const r = Math.random();
+    if(r < 0.5) bot.look(Math.random()*6.28, (Math.random()-0.5)*0.5);
+    else if(r < 0.8) { bot.setControlState('jump', true); setTimeout(()=>bot.setControlState('jump', false), 250); }
+    else { bot.swingArm('right'); }
+    setTimeout(() => startAntiAfk(bot), 20000 + Math.random()*40000);
+}
+
+// Canlı Veri Akışı (Her saniye panele data basar)
 setInterval(() => {
-    const data = {};
-    for (const id in bots) {
-        const b = bots[id];
-        if (b.entity) {
-            data[id] = {
+    let dataPack = {};
+    for (let user in bots) {
+        const b = bots[user];
+        if (b && b.entity) {
+            dataPack[user] = {
                 hp: b.health,
                 food: b.food,
                 pos: b.entity.position,
-                inv: b.inventory.slots.filter(s => s).map(s => ({ name: s.name, count: s.count, slot: s.slot }))
+                inv: b.inventory.slots.map((i, idx) => i ? {name: i.name, count: i.count, slot: idx} : null).filter(x => x)
             };
         }
     }
-    io.emit('bot_data', data);
+    io.emit('botData', dataPack);
 }, 1000);
 
+// Web Sunucusu
 app.use(express.static(__dirname));
-server.listen(process.env.PORT || 10000, () => console.log(chalk.green('Sistem 10000 portunda aktif!')));
-            
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+server.listen(process.env.PORT || 10000, () => console.log('GOD MODE Server Aktif!'));
+                        
