@@ -2,83 +2,106 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ULTIMATE ENGINE - GOD MODE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GOD MODE v5</title>
     <style>
-        :root { --bg: #050505; --card: #0f0f0f; --border: #222; --accent: #00ff88; --red: #ff3333; }
-        body { background: var(--bg); color: #eee; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        :root { --bg: #050505; --panel: #111; --border: #333; --accent: #00ff88; --red: #ff3333; --blue: #0088ff; }
+        body { background: var(--bg); color: #ddd; font-family: 'Courier New', monospace; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
         
-        .grid { display: grid; grid-template-columns: 300px 1fr 300px; gap: 15px; height: 100%; }
-        .box { background: var(--card); border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
-        .header { background: #1a1a1a; padding: 10px; font-size: 12px; font-weight: bold; color: var(--accent); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .box { background: var(--panel); border: 1px solid var(--border); padding: 10px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        h3 { margin: 0 0 10px 0; color: var(--accent); font-size: 14px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
         
-        input, select, button { background: #151515; border: 1px solid var(--border); color: #fff; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; }
-        button { cursor: pointer; background: var(--accent); color: #000; font-weight: bold; border: none; }
-        button:hover { opacity: 0.8; }
-
-        #logbox { flex: 1; overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace; font-size: 12px; background: #000; }
+        input, select, button { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: white; margin-bottom: 5px; border-radius: 4px; outline: none; }
+        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        .btn-green { background: var(--accent); color: black; }
+        .btn-red { background: var(--red); color: white; }
         
-        /* BOT LISTESI VE 6px KES BUTONU */
-        .bot-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
-        .bot-item.active { background: #1a1a1a; border-left: 3px solid var(--accent); }
-        .kes-btn { 
-            width: 16px; height: 16px; /* Görünürlük için çerçeve */
-            padding: 6px; /* İstenen 6px 6px iç alan etkisi */
-            background: var(--red); color: white; border: none; border-radius: 2px;
-            font-size: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
+        /* LOG EKRANI */
+        #logbox { height: 250px; overflow-y: auto; background: black; border: 1px solid #333; padding: 5px; font-size: 11px; margin-bottom: 5px; }
 
-        .stats { padding: 10px; display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; }
-        .ctrl-btns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; padding: 10px; }
-        .ctrl-btns button { margin: 0; padding: 15px; background: #222; color: #fff; border: 1px solid #333; }
-        .ctrl-btns button.active { background: var(--accent); color: #000; }
+        /* BOT LİSTESİ */
+        .bot-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #1a1a1a; margin-bottom: 5px; border-radius: 4px; border: 1px solid #333; cursor: pointer; }
+        .bot-row.selected { border-color: var(--accent); box-shadow: 0 0 5px var(--accent); }
+        .tiny-quit { width: 20px; height: 20px; padding: 0; display: flex; align-items: center; justify-content: center; background: var(--red); font-size: 10px; border-radius: 3px; }
 
-        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 10px; }
-        .slot { background: #1a1a1a; border: 1px solid #333; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; font-size: 10px; }
+        /* KONTROLLER */
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; max-width: 200px; margin: 0 auto; }
+        .ctrl-btn { height: 50px; background: #222; font-size: 18px; }
+        .ctrl-btn.active { background: var(--blue); color: white; }
+
+        .inv-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+        .slot { background: #222; border: 1px solid #444; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+        .slot img { width: 80%; }
+        .count { position: absolute; bottom: 0; right: 0; font-size: 9px; background: rgba(0,0,0,0.8); padding: 1px; }
+
+        .stat-bar { display: flex; justify-content: space-around; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div class="grid">
-    <div class="box">
-        <div class="header">SİSTEME GİRİŞ</div>
-        <div style="padding: 15px; display: flex; flex-direction: column;">
-            <input id="host" placeholder="Sunucu IP">
-            <input id="user" placeholder="Bot İsmi">
-            <select id="ver">
-                <option value="1.20.1">1.20.1</option>
-                <option value="1.19.4">1.19.4</option>
-                <option value="1.16.5">1.16.5</option>
-                <option value="1.8.9">1.8.9</option>
-            </select>
-            <button onclick="connect()">BAĞLAN</button>
-            <div id="botList" style="margin-top: 15px;"></div>
+<div class="box">
+    <h3>Sisteme Sız</h3>
+    <div style="display:flex; gap:5px;">
+        <input id="host" placeholder="IP Adresi">
+        <input id="port" placeholder="Port" value="25565" style="width: 80px;">
+    </div>
+    <div style="display:flex; gap:5px;">
+        <input id="user" placeholder="Kullanıcı Adı">
+        <select id="ver" style="width: 100px;">
+            <option value="1.20.1">1.20.1</option>
+            <option value="1.16.5">1.16.5</option>
+            <option value="1.8.9">1.8.9</option>
+        </select>
+    </div>
+    <button class="btn-green" onclick="startBot()">BAĞLAN (GOD MODE)</button>
+</div>
+
+<div class="box">
+    <h3>Aktif Botlar</h3>
+    <div id="botList"></div>
+</div>
+
+<div class="box">
+    <h3>Terminal</h3>
+    <div id="logbox"></div>
+    <div style="display:flex; gap:5px;">
+        <input id="msg" placeholder="Komut gönder..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button onclick="sendChat()" style="width:50px;">></button>
+    </div>
+    <div style="margin-top:5px; border-top:1px solid #333; padding-top:5px;">
+        <div style="display:flex; gap:5px;">
+            <input id="spamMsg" placeholder="Spam Metni">
+            <input id="spamDelay" type="number" placeholder="MS" value="1000" style="width:60px;">
+            <button id="spamBtn" onclick="toggleSpam()">SPAM</button>
         </div>
     </div>
+</div>
 
-    <div class="box">
-        <div class="header">KOMUT SATIRI VE LOGLAR</div>
-        <div id="logbox"></div>
-        <div style="padding: 10px; display: flex; gap: 5px;">
-            <input id="chatMsg" placeholder="Mesaj yaz..." style="flex: 1; margin: 0;">
-            <button onclick="sendChat()" style="width: 80px;">GÖNDER</button>
-        </div>
+<div class="box">
+    <h3>Kontrol & Durum</h3>
+    <div class="stat-bar">
+        <span style="color:red">❤ <span id="hp">--</span></span>
+        <span style="color:orange">🍖 <span id="food">--</span></span>
+    </div>
+    <div style="text-align:center; color:#888; font-size:10px; margin-bottom:10px;" id="pos">📍 Konum Yok</div>
+
+    <div class="grid-3">
+        <div></div><button class="ctrl-btn" id="btn-forward" onclick="move('forward')">W</button><div></div>
+        <button class="ctrl-btn" id="btn-left" onclick="move('left')">A</button>
+        <button class="ctrl-btn" id="btn-back" onclick="move('back')">S</button>
+        <button class="ctrl-btn" id="btn-right" onclick="move('right')">D</button>
+        <button class="ctrl-btn" id="btn-jump" onclick="move('jump')">🠕</button>
+        <button class="ctrl-btn" id="btn-sneak" onclick="move('sneak')">🠗</button>
     </div>
 
-    <div class="box">
-        <div class="header">DURUM VE KONTROL</div>
-        <div class="stats">
-            <span style="color: #ff4d4d;">HP: <span id="hp">--</span></span>
-            <span style="color: #ffa500;">AÇLIK: <span id="food">--</span></span>
-        </div>
-        <div class="ctrl-btns">
-            <div></div><button onmousedown="move('forward', true)" onmouseup="move('forward', false)">W</button><div></div>
-            <button onmousedown="move('left', true)" onmouseup="move('left', false)">A</button>
-            <button onmousedown="move('back', true)" onmouseup="move('back', false)">S</button>
-            <button onmousedown="move('right', true)" onmouseup="move('right', false)">D</button>
-            <button onclick="move('jump', true); setTimeout(()=>move('jump',false), 200)">Zıpla</button>
-        </div>
-        <div class="header">ENVANTER</div>
+    <div style="margin-top:10px; border-top:1px solid #333; padding-top:10px;">
+        <input id="coordInput" placeholder="X Y Z (Örn: 100 64 -200)">
+        <button style="background:var(--blue); color:white;" onclick="goto()">KOORDİNATA KOŞ</button>
+    </div>
+
+    <div style="margin-top:10px;">
+        <h3>Envanter</h3>
         <div class="inv-grid" id="inv"></div>
     </div>
 </div>
@@ -86,60 +109,113 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
     const socket = io();
-    let selectedBot = "";
+    let selBot = "";
+    let moveStates = {};
+    let isSpamming = false;
 
-    function connect() {
-        const host = document.getElementById('host').value;
-        const user = document.getElementById('user').value;
-        const ver = document.getElementById('ver').value;
-        if(host && user) socket.emit('start_bot', { host, user, ver });
-    }
+    // Bağlantı Listesini Güncelle
+    socket.on('botList', (list) => {
+        const div = document.getElementById('botList');
+        if(list.length === 0) div.innerHTML = "<small>Bot yok.</small>";
+        else {
+            div.innerHTML = list.map(u => `
+                <div class="bot-row ${selBot===u?'selected':''}" onclick="selBot='${u}'; renderList()">
+                    <span>${u}</span>
+                    <button class="tiny-quit" onclick="event.stopPropagation(); stopBot('${u}')">X</button>
+                </div>
+            `).join('');
+        }
+    });
 
-    socket.on('update_list', (list) => {
-        const container = document.getElementById('botList');
-        container.innerHTML = list.map(u => `
-            <div class="bot-item ${u === selectedBot ? 'active' : ''}" onclick="selectBot('${u}')">
-                <span>${u}</span>
-                <button class="kes-btn" onclick="socket.emit('stop_bot', '${u}')">X</button>
+    // Log Geldiğinde
+    socket.on('log', (data) => {
+        if(selBot && data.user !== selBot) return; // Sadece seçili botun logunu göster
+        const box = document.getElementById('logbox');
+        box.innerHTML += data.html;
+        box.scrollTop = box.scrollHeight;
+    });
+
+    // Canlı Veri (HP, Food, Inv)
+    socket.on('botData', (pack) => {
+        if(!selBot || !pack[selBot]) return;
+        const d = pack[selBot];
+        
+        document.getElementById('hp').innerText = Math.round(d.hp);
+        document.getElementById('food').innerText = Math.round(d.food);
+        if(d.pos) document.getElementById('pos').innerText = `X: ${d.pos.x.toFixed(0)} Y: ${d.pos.y.toFixed(0)} Z: ${d.pos.z.toFixed(0)}`;
+
+        const invDiv = document.getElementById('inv');
+        invDiv.innerHTML = d.inv.map(i => `
+            <div class="slot" onclick="drop(${i.slot})">
+                <img src="https://raw.githubusercontent.com/PrismarineJS/minecraft-assets/master/data/1.16.1/items/${i.name}.png">
+                <span class="count">${i.count}</span>
             </div>
         `).join('');
     });
 
-    socket.on('bot_log', (data) => {
-        if(data.user === selectedBot) {
-            const lb = document.getElementById('logbox');
-            lb.innerHTML += data.html;
-            lb.scrollTop = lb.scrollHeight;
+    function startBot() {
+        const host = document.getElementById('host').value;
+        const port = document.getElementById('port').value;
+        const user = document.getElementById('user').value;
+        const ver = document.getElementById('ver').value;
+        if(host && user) {
+            socket.emit('startBot', { host, port, user, ver, auto: true });
+            selBot = user;
         }
-    });
+    }
 
-    socket.on('bot_data', (allData) => {
-        if(selectedBot && allData[selectedBot]) {
-            const d = allData[selectedBot];
-            document.getElementById('hp').innerText = Math.round(d.hp);
-            document.getElementById('food').innerText = Math.round(d.food);
-            
-            const invHtml = d.inv.map(i => `<div class="slot" title="${i.name}"><span>${i.count}</span></div>`).join('');
-            document.getElementById('inv').innerHTML = invHtml;
+    function stopBot(u) {
+        if(confirm(u + " atılsın mı?")) {
+            socket.emit('stopBot', u);
+            if(selBot === u) selBot = "";
         }
-    });
-
-    function selectBot(u) {
-        selectedBot = u;
-        document.getElementById('logbox').innerHTML = ""; // Yeni botun logları için temizle
-        socket.emit('update_list', []); // Görsel güncelleme tetikle
     }
 
     function sendChat() {
-        const msg = document.getElementById('chatMsg').value;
-        if(selectedBot && msg) {
-            socket.emit('send_chat', { user: selectedBot, msg });
-            document.getElementById('chatMsg').value = "";
+        const i = document.getElementById('msg');
+        if(selBot && i.value) {
+            socket.emit('chat', { user: selBot, msg: i.value });
+            i.value = "";
         }
     }
 
-    function move(dir, state) {
-        if(selectedBot) socket.emit('move_bot', { user: selectedBot, dir, state });
+    function toggleSpam() {
+        if(!selBot) return;
+        isSpamming = !isSpamming;
+        const btn = document.getElementById('spamBtn');
+        const msg = document.getElementById('spamMsg').value || "Spam";
+        const delay = document.getElementById('spamDelay').value || 1000;
+
+        if(isSpamming) {
+            btn.style.background = "red";
+            socket.emit('spam', { user: selBot, state: true, msg, delay });
+        } else {
+            btn.style.background = "";
+            socket.emit('spam', { user: selBot, state: false });
+        }
+    }
+
+    function move(dir) {
+        if(!selBot) return;
+        moveStates[dir] = !moveStates[dir];
+        document.getElementById('btn-'+dir).classList.toggle('active', moveStates[dir]);
+        socket.emit('move', { user: selBot, dir, state: moveStates[dir] });
+    }
+
+    function goto() {
+        if(!selBot) return;
+        const raw = document.getElementById('coordInput').value.split(' ');
+        if(raw.length >= 3) {
+            socket.emit('goto', { user: selBot, x: raw[0], y: raw[1], z: raw[2] });
+        }
+    }
+
+    function drop(slot) {
+        if(selBot) socket.emit('drop', { user: selBot, slot });
+    }
+
+    function renderList() {
+        // Seçim değişince UI güncellemesi için tetikleyici (Boş kalabilir, socket.on('botList') hallediyor)
     }
 </script>
 </body>
